@@ -35,13 +35,17 @@ jobs:
       - name: Générer le projet Android
         run: npx expo prebuild --platform android
 
+      - name: Intégrer le code dans l'APK
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx expo export:embed --platform android --dev false --minify false --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
       - name: Compiler l'APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
-
+          ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: tempo-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/debug/app-app-debug.apk
