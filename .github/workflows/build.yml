@@ -48,4 +48,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: tempo-apk
-          path: android/app/build/outputs/apk/debug/app-app-debug.apk
+          path: android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
