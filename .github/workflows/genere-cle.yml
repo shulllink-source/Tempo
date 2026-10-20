@@ -1,0 +1,14 @@
+name: Générer la clé (une seule fois)
+on: workflow_dispatch
+jobs:
+  cle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Créer la clé
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          base64 -w 0 debug.keystore > cle.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cle
+          path: cle.txt
