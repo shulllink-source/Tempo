@@ -30,7 +30,7 @@ jobs:
       - name: Installer les dépendances
         run: |
           npm install --legacy-peer-deps
-          npx expo install expo-status-bar -- --legacy-peer-deps
+          npx expo install expo-status-bar react-native-safe-area-context -- --legacy-peer-deps
           npx expo install --fix
 
       - name: Générer le projet Android
