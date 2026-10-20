@@ -1,0 +1,1 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';import {StateStorage,createJSONStorage} from 'zustand/middleware';export const storage=createJSONStorage(()=>AsyncStorage) as StateStorage;
