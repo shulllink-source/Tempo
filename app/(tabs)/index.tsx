@@ -40,6 +40,11 @@ function Home(){
   useEffect(()=>{const id=setInterval(()=>{useTimer.getState().sync();setTick(x=>x+1);},500);return()=>clearInterval(id);},[]);
   const preset=t.presets.find(p=>p.id===t.presetId)||t.presets[0];
   const phase=preset?.phases?.[t.phaseIndex];
+  const elapsed=t.elapsedBefore+(t.running&&t.startedAt?Date.now()-t.startedAt:0);
+  const timerText=fmt(t.durationSec*1000-elapsed);
+  const elapsed = t.elapsedBefore + (t.running && t.startedAt ? Date.now() - t.startedAt : 0);
+  const leftSec = Math.max(0, Math.round(t.durationSec - elapsed / 1000));
+  const timerText = `${String(Math.floor(leftSec / 60)).padStart(2, '0')}:${String(leftSec % 60).padStart(2, '0')}`;
   const track=m.tracks[m.currentIndex];
   const plays=Object.values(m.playCounts).reduce((a:number,b:any)=>a+b,0);
   const card=[s.card,{backgroundColor:colors.card,borderColor:colors.line}];
@@ -58,10 +63,8 @@ function Home(){
 
     <Pressable style={card} onPress={()=>router.push('/timer' as never)}>
       <Text style={[s.cardLabel,{color:colors.muted}]}>POMODORO</Text>
-      const elapsed = t.elapsedBefore + (t.running && t.startedAt ? Date.now() - t.startedAt : 0);
-      const leftSec = Math.max(0, Math.round(t.durationSec - elapsed / 1000));
-      const timerText = `${String(Math.floor(leftSec / 60)).padStart(2, '0')}:${String(leftSec % 60).padStart(2, '0')}`;
-      <Text style={{color:colors.muted}}>{preset?.name}</Text>
+      <Text style={[s.cardTitle,{color:colors.text,fontSize:34}]}>{timerText}</Text>
+      <Text style={{color:colors.muted}}>{preset?.name}{phase?` · ${phase.name}`:''}</Text>
     </Pressable>
 
     <Pressable style={card} onPress={()=>router.push('/activities' as never)}>
