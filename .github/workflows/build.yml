@@ -12,7 +12,7 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup
           sudo rm -rf /opt/hostedtoolcache/CodeQL /usr/local/share/boost
-          sudo rm -rf /usr/local/lib/node_modules /usr/share/swift
+          sudo rm -rf /usr/share/swift
           sudo docker image prune --all --force || true
           df -h
 
@@ -36,16 +36,25 @@ jobs:
       - name: Générer le projet Android
         run: npx expo prebuild --platform android
 
+      - name: Utiliser la clé de signature fixe
+        run: echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > android/app/debug.keystore
+
       - name: Intégrer le code dans l'APK
         run: |
           mkdir -p android/app/src/main/assets
           npx expo export:embed --platform android --dev false --minify false --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
+      - name: Installer le NDK proprement
+        run: |
+          rm -rf $ANDROID_HOME/ndk/27.1.12297006
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.1.12297006" > /dev/null
 
       - name: Compiler l'APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a --no-daemon
+
       - uses: actions/upload-artifact@v4
         with:
           name: tempo-apk
