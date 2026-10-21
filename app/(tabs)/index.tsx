@@ -58,7 +58,9 @@ function Home(){
 
     <Pressable style={card} onPress={()=>router.push('/timer' as never)}>
       <Text style={[s.cardLabel,{color:colors.muted}]}>POMODORO</Text>
-      <Text style={[s.cardTitle,{color:colors.text}]}>{t.running?`${phase?.name||'En cours'} · ${fmt(t.remainingMs??0)}`:'Prêt à démarrer'}</Text>
+      const elapsed = t.elapsedBefore + (t.running && t.startedAt ? Date.now() - t.startedAt : 0);
+      const leftSec = Math.max(0, Math.round(t.durationSec - elapsed / 1000));
+      const timerText = `${String(Math.floor(leftSec / 60)).padStart(2, '0')}:${String(leftSec % 60).padStart(2, '0')}`;
       <Text style={{color:colors.muted}}>{preset?.name}</Text>
     </Pressable>
 
