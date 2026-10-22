@@ -12,9 +12,11 @@ export const radius={sm:10,md:16,lg:24,pill:999};
 
 export function useTheme(){
   const mode=useSettings(s=>s.themeMode) as string;
+  const accentColor=useSettings(s=>s.accentColor);
   const system=useColorScheme();
   const scheme=mode==='system'?(system||'dark'):mode;
-  const colors=scheme==='pink'?pink:scheme==='light'?light:dark;
+  const base=scheme==='pink'?pink:scheme==='light'?light:dark;
+  const colors=useMemo(()=>accentColor?{...base,accent:accentColor}:base,[base,accentColor]);
   return {scheme,colors};
 }
 
