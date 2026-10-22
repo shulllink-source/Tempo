@@ -1,1 +1,18 @@
-import {create} from 'zustand';import {persist} from 'zustand/middleware';import {storage} from './persist';type Mode='light'|'dark'|'system';type State={themeMode:Mode;accentColor:string;setTheme:(v:Mode)=>void;setAccent:(v:string)=>void};export const useSettings=create<State>()(persist((set)=>({themeMode:'dark',accentColor:'#ff5fa2',setTheme:themeMode=>set({themeMode}),setAccent:accentColor=>set({accentColor})}),{name:'tempo-settings-v2',storage}));
+import {create} from 'zustand';
+import {persist} from 'zustand/middleware';
+import {storage} from './persist';
+
+export type Mode = 'light' | 'dark' | 'system' | 'pink';
+type State = {
+  themeMode: Mode;
+  accentColor: string | null;
+  setTheme: (v: Mode) => void;
+  setAccent: (v: string | null) => void;
+};
+
+export const useSettings = create<State>()(persist((set) => ({
+  themeMode: 'dark',
+  accentColor: null,
+  setTheme: themeMode => set({themeMode}),
+  setAccent: accentColor => set({accentColor}),
+}), {name: 'tempo-settings-v3', storage}));
