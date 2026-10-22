@@ -1,0 +1,117 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { storage } from './persist';
+import { AgendaEvent, AgendaRecurrence } from '../types';
+
+export type AgendaOccurrence = AgendaEvent & {
+  occurrenceId: string;
+  occurrenceStart: string;
+};
+
+type State = {
+  events: AgendaEvent[];
+  addEvent: (event: Omit<AgendaEvent, 'id' | 'createdAt'>) => AgendaEvent;
+  deleteEvent: (id: string) => void;
+  getOccurrences: (limit?: number) => AgendaOccurrence[];
+};
+
+const clampDate = (value: string) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  return value;
+};
+
+const parseDate = (date: string, time: string) => {
+  const fixedDate = clampDate(date);
+  const safeTime = time || '09:00';
+  const value = new Date(`${fixedDate}T${safeTime}:00`);
+  return Number.isNaN(value.getTime()) ? new Date() : value;
+};
+
+const buildRecurrence = (event: AgendaEvent, limit = 20): AgendaOccurrence[] => {
+  const occurrences: AgendaOccurrence[] = [];
+  const start = parseDate(event.date, event.time);
+  const recurrence = event.recurrence ?? 'once';
+
+  if (recurrence === 'once') {
+    return [{
+      ...event,
+      occurrenceId: `${event.id}-once`,
+      occurrenceStart: start.toISOString(),
+    }];
+  }
+
+  let cursor = new Date(start);
+  const endLimit = new Date();
+  endLimit.setMonth(endLimit.getMonth() + 6);
+
+  for (let index = 0; index < limit && cursor <= endLimit; index += 1) {
+    occurrences.push({
+      ...event,
+      occurrenceId: `${event.id}-${index}`,
+      occurrenceStart: cursor.toISOString(),
+    });
+
+    if (recurrence === 'weekly') {
+      cursor = new Date(cursor);
+      cursor.setDate(cursor.getDate() + 7);
+    } else if (recurrence === 'monthly') {
+      cursor = new Date(cursor);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  return occurrences;
+};
+
+const defaultEvents: AgendaEvent[] = [
+  {
+    id: 'seed-1',
+    title: 'Réunion d’équipe',
+    date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    time: '10:00',
+    notes: 'Suivi de sprint',
+    location: 'Bureau',
+    color: '#73a7ff',
+    recurrence: 'weekly',
+    allDay: false,
+    createdAt: Date.now(),
+  },
+  {
+    id: 'seed-2',
+    title: 'Période de focus',
+    date: new Date(Date.now() + 172800000).toISOString().slice(0, 10),
+    time: '14:30',
+    notes: 'Travail profond sans interruption',
+    location: 'Maison',
+    color: '#e8b04b',
+    recurrence: 'monthly',
+    allDay: false,
+    createdAt: Date.now(),
+  },
+];
+
+export const useAgenda = create<State>()(persist((set, get) => ({
+  events: defaultEvents,
+  addEvent: (event) => {
+    const prepared: AgendaEvent = {
+      ...event,
+      id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      recurrence: (event.recurrence ?? 'once') as AgendaRecurrence,
+      createdAt: Date.now(),
+    };
+
+    set((state) => ({ events: [...state.events, prepared] }));
+    return prepared;
+  },
+  deleteEvent: (id) => set((state) => ({
+    events: state.events.filter((item) => item.id !== id),
+  })),
+  getOccurrences: (limit = 20) => {
+    const entries = get().events.flatMap((event) => buildRecurrence(event, limit));
+    return entries.sort(
+      (a, b) => new Date(a.occurrenceStart).getTime() - new Date(b.occurrenceStart).getTime(),
+    );
+  },
+}), { name: 'tempo-agenda-v1', storage }));
