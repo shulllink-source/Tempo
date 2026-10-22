@@ -1,0 +1,269 @@
+import { View, Pressable, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router, usePathname } from 'expo-router';
+import { useTheme } from '../theme';
+
+const NAV_ITEMS = [
+  { key: 'home', label: 'Accueil', route: '/(tabs)', icon: 'home', outline: 'home-outline' },
+  { key: 'clock', label: 'Heure', route: '/clock', icon: 'time', outline: 'time-outline' },
+  { key: 'music', label: 'Musique', route: '/music', icon: 'musical-notes', outline: 'musical-notes-outline' },
+  { key: 'activity', label: 'Activités', route: '/(tabs)/activities', icon: 'flash', outline: 'flash-outline' },
+  { key: 'more', label: 'Plus', route: '/(tabs)/more', icon: 'grid', outline: 'grid-outline' },
+] as const;
+
+export function GlobalBottomNav() {
+  const { colors } = useTheme();
+  const pathname = usePathname();
+
+  const isActive = (route: string) => {
+    if (route === '/(tabs)') return pathname === '/(tabs)' || pathname === '/';
+    return pathname === route;
+  };
+
+  return (
+    <View style={[styles.bar, { backgroundColor: colors.card, borderTopColor: colors.line }]}> 
+      {NAV_ITEMS.map((item) => {
+        const active = isActive(item.route);
+
+        return (
+          <Pressable
+            key={item.key}
+            style={styles.item}
+            onPress={() => router.replace(item.route as never)}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name={active ? item.icon : item.outline}
+              size={22}
+              color={active ? colors.accent : colors.muted}
+            />
+            <Text style={[styles.label, { color: active ? colors.accent : colors.muted }]}>{item.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bar: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 12,
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  item: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    paddingVertical: 6,
+  },
+  label: {
+    marginTop: 3,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

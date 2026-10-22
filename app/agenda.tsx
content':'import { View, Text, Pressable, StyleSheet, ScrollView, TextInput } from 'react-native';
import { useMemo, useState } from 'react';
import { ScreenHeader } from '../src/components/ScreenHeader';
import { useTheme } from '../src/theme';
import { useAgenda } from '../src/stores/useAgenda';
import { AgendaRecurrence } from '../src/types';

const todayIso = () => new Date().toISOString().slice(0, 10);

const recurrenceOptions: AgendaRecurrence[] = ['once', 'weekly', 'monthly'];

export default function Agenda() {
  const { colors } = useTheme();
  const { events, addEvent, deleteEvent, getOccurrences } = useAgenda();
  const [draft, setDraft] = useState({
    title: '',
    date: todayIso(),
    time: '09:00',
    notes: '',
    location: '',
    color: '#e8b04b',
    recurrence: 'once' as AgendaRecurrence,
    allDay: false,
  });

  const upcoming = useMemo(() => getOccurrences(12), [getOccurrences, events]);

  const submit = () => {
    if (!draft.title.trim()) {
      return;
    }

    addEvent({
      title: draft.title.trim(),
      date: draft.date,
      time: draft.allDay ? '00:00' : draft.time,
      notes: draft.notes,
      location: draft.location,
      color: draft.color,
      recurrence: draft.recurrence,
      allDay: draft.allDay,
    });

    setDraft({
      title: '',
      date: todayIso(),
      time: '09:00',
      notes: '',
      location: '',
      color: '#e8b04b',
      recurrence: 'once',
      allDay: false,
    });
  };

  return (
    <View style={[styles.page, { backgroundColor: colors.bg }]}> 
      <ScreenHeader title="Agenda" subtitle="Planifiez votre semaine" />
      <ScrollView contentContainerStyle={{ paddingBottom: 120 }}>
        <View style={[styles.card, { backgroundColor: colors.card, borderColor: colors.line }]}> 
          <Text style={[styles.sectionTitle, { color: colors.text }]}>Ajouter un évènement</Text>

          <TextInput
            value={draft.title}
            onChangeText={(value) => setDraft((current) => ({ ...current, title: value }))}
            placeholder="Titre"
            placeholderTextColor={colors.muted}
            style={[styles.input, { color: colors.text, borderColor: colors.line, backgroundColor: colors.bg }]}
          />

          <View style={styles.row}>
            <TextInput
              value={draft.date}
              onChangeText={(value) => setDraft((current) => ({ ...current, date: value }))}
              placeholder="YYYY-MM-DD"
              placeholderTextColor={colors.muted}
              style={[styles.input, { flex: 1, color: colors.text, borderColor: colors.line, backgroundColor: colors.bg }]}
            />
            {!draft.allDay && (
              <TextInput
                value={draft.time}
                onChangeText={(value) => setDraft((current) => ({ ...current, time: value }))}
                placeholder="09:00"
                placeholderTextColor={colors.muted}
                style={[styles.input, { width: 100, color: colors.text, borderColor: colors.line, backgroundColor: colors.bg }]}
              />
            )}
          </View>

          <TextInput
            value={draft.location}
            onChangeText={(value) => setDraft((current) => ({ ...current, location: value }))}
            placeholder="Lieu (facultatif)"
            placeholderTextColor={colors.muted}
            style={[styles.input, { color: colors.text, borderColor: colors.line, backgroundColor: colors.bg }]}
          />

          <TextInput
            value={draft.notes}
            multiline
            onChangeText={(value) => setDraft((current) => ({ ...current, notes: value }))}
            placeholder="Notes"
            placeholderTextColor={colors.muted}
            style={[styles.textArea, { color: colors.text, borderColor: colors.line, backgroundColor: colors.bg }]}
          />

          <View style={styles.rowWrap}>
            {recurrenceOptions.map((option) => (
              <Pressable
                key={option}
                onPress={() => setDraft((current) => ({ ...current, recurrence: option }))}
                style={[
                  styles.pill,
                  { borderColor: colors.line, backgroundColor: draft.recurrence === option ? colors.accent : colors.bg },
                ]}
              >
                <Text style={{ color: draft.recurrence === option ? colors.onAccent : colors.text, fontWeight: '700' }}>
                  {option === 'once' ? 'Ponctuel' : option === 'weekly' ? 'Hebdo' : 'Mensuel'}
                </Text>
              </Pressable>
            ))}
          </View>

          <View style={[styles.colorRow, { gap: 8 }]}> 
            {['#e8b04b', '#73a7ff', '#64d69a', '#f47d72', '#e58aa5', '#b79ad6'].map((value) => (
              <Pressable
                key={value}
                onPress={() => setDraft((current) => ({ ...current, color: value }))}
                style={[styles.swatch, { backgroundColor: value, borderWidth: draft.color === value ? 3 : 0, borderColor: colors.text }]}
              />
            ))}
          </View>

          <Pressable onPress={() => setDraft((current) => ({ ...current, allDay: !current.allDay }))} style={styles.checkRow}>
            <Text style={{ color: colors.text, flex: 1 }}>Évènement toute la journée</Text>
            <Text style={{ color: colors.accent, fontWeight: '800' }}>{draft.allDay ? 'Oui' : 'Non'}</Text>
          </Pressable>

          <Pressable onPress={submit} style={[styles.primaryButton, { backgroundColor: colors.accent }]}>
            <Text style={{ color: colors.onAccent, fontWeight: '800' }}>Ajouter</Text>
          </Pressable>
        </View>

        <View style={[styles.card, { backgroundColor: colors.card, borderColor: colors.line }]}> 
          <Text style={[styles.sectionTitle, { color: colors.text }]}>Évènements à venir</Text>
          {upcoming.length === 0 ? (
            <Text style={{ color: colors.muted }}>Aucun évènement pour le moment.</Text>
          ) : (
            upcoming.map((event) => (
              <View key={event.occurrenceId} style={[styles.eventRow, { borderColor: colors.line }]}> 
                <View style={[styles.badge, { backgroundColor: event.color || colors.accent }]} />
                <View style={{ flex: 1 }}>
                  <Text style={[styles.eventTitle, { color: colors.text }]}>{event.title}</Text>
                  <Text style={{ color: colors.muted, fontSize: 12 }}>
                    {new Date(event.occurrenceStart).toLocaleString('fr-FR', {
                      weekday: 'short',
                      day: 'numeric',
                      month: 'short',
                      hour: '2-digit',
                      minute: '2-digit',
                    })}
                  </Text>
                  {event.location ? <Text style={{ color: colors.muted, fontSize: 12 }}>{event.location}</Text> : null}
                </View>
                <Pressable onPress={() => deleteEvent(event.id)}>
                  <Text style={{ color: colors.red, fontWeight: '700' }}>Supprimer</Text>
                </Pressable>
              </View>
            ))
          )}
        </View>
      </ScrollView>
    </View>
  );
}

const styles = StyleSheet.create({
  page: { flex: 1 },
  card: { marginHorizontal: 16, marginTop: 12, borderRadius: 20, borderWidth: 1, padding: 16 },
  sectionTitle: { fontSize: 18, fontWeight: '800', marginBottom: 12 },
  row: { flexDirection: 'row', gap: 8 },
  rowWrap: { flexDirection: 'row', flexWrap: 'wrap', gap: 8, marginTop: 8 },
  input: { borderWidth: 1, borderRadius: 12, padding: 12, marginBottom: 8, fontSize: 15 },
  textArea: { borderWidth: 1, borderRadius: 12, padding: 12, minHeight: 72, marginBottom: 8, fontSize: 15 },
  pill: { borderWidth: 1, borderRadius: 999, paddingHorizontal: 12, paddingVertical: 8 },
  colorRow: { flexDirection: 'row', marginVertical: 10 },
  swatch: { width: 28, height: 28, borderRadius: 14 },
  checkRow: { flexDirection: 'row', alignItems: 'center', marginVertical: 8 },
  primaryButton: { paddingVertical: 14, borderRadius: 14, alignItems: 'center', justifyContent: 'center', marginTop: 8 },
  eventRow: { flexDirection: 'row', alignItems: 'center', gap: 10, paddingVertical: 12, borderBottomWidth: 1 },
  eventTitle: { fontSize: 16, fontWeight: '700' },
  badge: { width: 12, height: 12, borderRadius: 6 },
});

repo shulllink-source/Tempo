@@ -1,0 +1,559 @@
+import { View, Text, Pressable, StyleSheet, ScrollView, FlatList, useWindowDimensions } from 'react-native';
+import { router } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../src/theme';
+import { useTimer } from '../../src/stores/useTimer';
+import { useMusic } from '../../src/stores/useMusic';
+import { useAgenda } from '../../src/stores/useAgenda';
+import { useActivity } from '../../src/stores/useActivity';
+
+const fmt = (ms: number) => {
+  const t = Math.max(0, Math.ceil(ms / 1000));
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
+
+const PAGES = [
+  { key: 'home', title: 'Accueil', icon: 'home-outline', route: '/(tabs)' },
+  { key: 'agenda', title: 'Agenda', icon: 'calendar-outline', route: '/agenda' },
+  { key: 'timer', title: 'Pomodoro', icon: 'timer-outline', route: '/(tabs)/timer' },
+  { key: 'activity', title: 'Activités', icon: 'flash-outline', route: '/(tabs)/activities' },
+  { key: 'stats', title: 'Statistiques', icon: 'stats-chart-outline', route: '/(tabs)/more' },
+  { key: 'clock', title: 'Horloge', icon: 'time-outline', route: '/clock' },
+  { key: 'music', title: 'Musique', icon: 'musical-notes-outline', route: '/music' },
+] as const;
+
+function HomeOverview() {
+  const { colors } = useTheme();
+  const timer = useTimer();
+  const music = useMusic();
+  const activities = useActivity((state) => state.activities);
+  const occurrences = useAgenda((state) => state.getOccurrences(3));
+
+  const preset = timer.presets.find((p) => p.id === timer.presetId) || timer.presets[0];
+  const phase = preset?.phases?.[timer.phaseIndex] || preset?.phases?.[0];
+  const elapsed = timer.elapsedBefore + (timer.running && timer.startedAt ? Date.now() - timer.startedAt : 0);
+  const remainingMs = Math.max(0, timer.durationSec * 1000 - elapsed);
+  const activeTrack = music.tracks[music.currentIndex];
+  const nextEvent = occurrences[0];
+
+  return (
+    <ScrollView contentContainerStyle={styles.homeContent} showsVerticalScrollIndicator={false}>
+      <Text style={[styles.hello, { color: colors.text }]}>Tempo</Text>
+
+      <Pressable style={[styles.card, { backgroundColor: colors.card, borderColor: colors.line }]} onPress={() => router.push('/music' as never)}>
+        <Text style={[styles.cardLabel, { color: colors.muted }]}>MUSIQUE</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+          {activeTrack?.filename?.replace(/\.[^.]+$/, '') || 'Aucune musique sélectionnée'}
+        </Text>
+        <View style={styles.ctrlRow}>
+          <Pressable onPress={() => music.previous()}><Ionicons name="play-skip-back" size={26} color={colors.text} /></Pressable>
+          <Pressable onPress={() => music.toggle()} style={[styles.playButton, { backgroundColor: colors.accent }]}>
+            <Ionicons name={music.isPlaying ? 'pause' : 'play'} size={26} color={colors.onAccent} />
+          </Pressable>
+          <Pressable onPress={() => music.next()}><Ionicons name="play-skip-forward" size={26} color={colors.text} /></Pressable>
+        </View>
+      </Pressable>
+
+      <Pressable style={[styles.card, { backgroundColor: colors.card, borderColor: colors.line }]} onPress={() => router.push('/(tabs)/timer' as never)}>
+        <Text style={[styles.cardLabel, { color: colors.muted }]}>POMODORO</Text>
+        <Text style={[styles.cardTitleLarge, { color: colors.text }]}>{fmt(remainingMs)}</Text>
+        <Text style={{ color: colors.muted }}>{preset?.name || 'Focus'} · {phase?.name || 'Travail'}</Text>
+      </Pressable>
+
+      <Pressable style={[styles.card, { backgroundColor: colors.card, borderColor: colors.line }]} onPress={() => router.push('/(tabs)/activities' as never)}>
+        <Text style={[styles.cardLabel, { color: colors.muted }]}>ACTIVITÉS</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{activities.length} activité{activities.length > 1 ? 's' : ''}</Text>
+        <Text style={{ color: colors.muted }}>{activities[0]?.name || 'Aucune activité enregistrée'}</Text>
+      </Pressable>
+
+      <Pressable style={[styles.card, { backgroundColor: colors.card, borderColor: colors.line }]} onPress={() => router.push('/agenda' as never)}>
+        <Text style={[styles.cardLabel, { color: colors.muted }]}>AGENDA</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{nextEvent?.title || 'Aucun évènement prévu'}</Text>
+        <Text style={{ color: colors.muted }}>
+          {nextEvent ? `${nextEvent.date} • ${nextEvent.time}` : 'Ajoutez un évènement'}
+        </Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+function AgendaSlide() {
+  const { colors } = useTheme();
+  const items = useAgenda((state) => state.getOccurrences(5));
+
+  return (
+    <View style={[styles.slidePage, { backgroundColor: colors.bg }]}> 
+      <Text style={[styles.slideTitle, { color: colors.text }]}>Agenda</Text>
+      <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+        {items.length === 0 ? (
+          <Text style={{ color: colors.muted }}>Aucun évènement à venir.</Text>
+        ) : (
+          items.map((item) => (
+            <View key={item.occurrenceId} style={[styles.eventRow, { borderColor: colors.line }]}>
+              <View style={[styles.eventBadge, { backgroundColor: item.color || colors.accent }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.eventTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={{ color: colors.muted, fontSize: 12 }}>
+                  {new Date(item.occurrenceStart).toLocaleString('fr-FR', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+      <Pressable onPress={() => router.push('/agenda' as never)} style={[styles.primaryButton, { backgroundColor: colors.accent }]}>
+        <Text style={{ color: colors.onAccent, fontWeight: '800' }}>Ajouter un évènement</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function TimerSlide() {
+  const { colors } = useTheme();
+  const timer = useTimer();
+  const preset = timer.presets.find((p) => p.id === timer.presetId) || timer.presets[0];
+  const phase = preset?.phases?.[timer.phaseIndex] || preset?.phases?.[0];
+  const elapsed = timer.elapsedBefore + (timer.running && timer.startedAt ? Date.now() - timer.startedAt : 0);
+  const remainingMs = Math.max(0, timer.durationSec * 1000 - elapsed);
+
+  return (
+    <View style={[styles.slidePage, { backgroundColor: colors.bg }]}> 
+      <Text style={[styles.slideTitle, { color: colors.text }]}>Pomodoro</Text>
+      <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+        <Text style={[styles.cardTitleLarge, { color: colors.text }]}>{fmt(remainingMs)}</Text>
+        <Text style={{ color: colors.muted, marginBottom: 8 }}>{preset?.name || 'Classique'} · {phase?.name || 'Travail'}</Text>
+        <Text style={{ color: colors.muted }}>Cycle {timer.cycle} · Phase {timer.phaseIndex + 1}</Text>
+      </View>
+      <Pressable onPress={() => router.push('/(tabs)/timer' as never)} style={[styles.primaryButton, { backgroundColor: colors.accent }]}>
+        <Text style={{ color: colors.onAccent, fontWeight: '800' }}>Ouvrir le minuteur</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ActivitySlide() {
+  const { colors } = useTheme();
+  const activities = useActivity((state) => state.activities);
+
+  return (
+    <View style={[styles.slidePage, { backgroundColor: colors.bg }]}> 
+      <Text style={[styles.slideTitle, { color: colors.text }]}>Activités</Text>
+      <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+        {activities.length === 0 ? (
+          <Text style={{ color: colors.muted }}>Aucune activité créée.</Text>
+        ) : (
+          activities.slice(0, 4).map((item) => (
+            <View key={item.id} style={[styles.activityItem, { borderColor: colors.line }]}> 
+              <View style={[styles.activityIcon, { backgroundColor: item.color || colors.accent }]}><Text>{item.icon || '•'}</Text></View>
+              <Text style={{ color: colors.text, flex: 1 }}>{item.name}</Text>
+            </View>
+          ))
+        )}
+      </View>
+      <Pressable onPress={() => router.push('/(tabs)/activities' as never)} style={[styles.primaryButton, { backgroundColor: colors.accent }]}>
+        <Text style={{ color: colors.onAccent, fontWeight: '800' }}>Gérer les activités</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ClockSlide() {
+  const { colors } = useTheme();
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <View style={[styles.slidePage, { backgroundColor: colors.bg }]}> 
+      <Text style={[styles.slideTitle, { color: colors.text }]}>Horloge</Text>
+      <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+        <Text style={[styles.clockBig, { color: colors.text }]}>{now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Text>
+        <Text style={{ color: colors.muted }}>{now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+      </View>
+      <Pressable onPress={() => router.push('/clock' as never)} style={[styles.primaryButton, { backgroundColor: colors.accent }]}>
+        <Text style={{ color: colors.onAccent, fontWeight: '800' }}>Voir l’horloge</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function StatsSlide() {
+  const { colors } = useTheme();
+  const music = useMusic();
+  const timer = useTimer();
+  const activityCount = useActivity((state) => state.activities.length);
+  const plays = Object.values(music.playCounts).reduce((sum, value) => sum + Number(value || 0), 0);
+
+  return (
+    <View style={[styles.slidePage, { backgroundColor: colors.bg }]}> 
+      <Text style={[styles.slideTitle, { color: colors.text }]}>Statistiques</Text>
+      <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+        <Text style={{ color: colors.muted }}>Écoutes</Text>
+        <Text style={[styles.statValue, { color: colors.text }]}>{plays}</Text>
+        <Text style={{ color: colors.muted }}>Activités</Text>
+        <Text style={[styles.statValue, { color: colors.text }]}>{activityCount}</Text>
+        <Text style={{ color: colors.muted }}>Pomodoros</Text>
+        <Text style={[styles.statValue, { color: colors.text }]}>{timer.completedPomodoros}</Text>
+      </View>
+      <Pressable onPress={() => router.push('/(tabs)/more' as never)} style={[styles.primaryButton, { backgroundColor: colors.accent }]}>
+        <Text style={{ color: colors.onAccent, fontWeight: '800' }}>Détails</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function slideContent(key: string) {
+  switch (key) {
+    case 'agenda':
+      return <AgendaSlide />;
+    case 'timer':
+      return <TimerSlide />;
+    case 'activity':
+      return <ActivitySlide />;
+    case 'clock':
+      return <ClockSlide />;
+    case 'stats':
+      return <StatsSlide />;
+    case 'music':
+      return <HomeOverview />;
+    default:
+      return <HomeOverview />;
+  }
+}
+
+function PageCard({ page }: { page: (typeof PAGES)[number] }) {
+  const { colors } = useTheme();
+
+  return (
+    <View style={{ width: '100%', flex: 1, backgroundColor: colors.bg }}>
+      {page.key === 'home' ? <HomeOverview /> : slideContent(page.key)}
+    </View>
+  );
+}
+
+export default function Dashboard() {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const ref = useRef<FlatList>(null);
+  const [idx, setIdx] = useState(0);
+
+  const data = useMemo(() => PAGES, []);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      <FlatList
+        ref={ref}
+        data={data}
+        keyExtractor={(item) => item.key}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={0}
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        onMomentumScrollEnd={(event) => setIdx(Math.round(event.nativeEvent.contentOffset.x / width))}
+        renderItem={({ item }) => <PageCard page={item} />}
+      />
+      <View style={styles.dotsRow}>
+        {data.map((page, index) => (
+          <Pressable
+            key={page.key}
+            onPress={() => {
+              ref.current?.scrollToIndex({ index, animated: true });
+              setIdx(index);
+            }}
+            hitSlop={8}
+          >
+            <View style={[styles.dot, { backgroundColor: index === idx ? colors.accent : colors.line, width: index === idx ? 22 : 8 }]} />
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  homeContent: { padding: 16, gap: 14, paddingBottom: 90 },
+  hello: { fontSize: 34, fontWeight: '800', marginBottom: 6 },
+  card: { padding: 18, borderRadius: 22, borderWidth: 1, gap: 6 },
+  cardLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  cardTitle: { fontSize: 20, fontWeight: '800' },
+  cardTitleLarge: { fontSize: 34, fontWeight: '800', marginBottom: 4 },
+  ctrlRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+  playButton: { width: 54, height: 54, borderRadius: 27, justifyContent: 'center', alignItems: 'center' },
+  slidePage: { flex: 1, padding: 20, paddingBottom: 90 },
+  slideTitle: { fontSize: 28, fontWeight: '800', marginBottom: 16 },
+  listCard: { borderRadius: 20, borderWidth: 1, padding: 16, gap: 12 },
+  primaryButton: { marginTop: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
+  dotsRow: { position: 'absolute', bottom: 86, alignSelf: 'center', flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  dot: { height: 8, borderRadius: 4 },
+  eventRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
+  eventBadge: { width: 12, height: 12, borderRadius: 6 },
+  eventTitle: { fontSize: 16, fontWeight: '700' },
+  activityItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: 1 },
+  activityIcon: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  clockBig: { fontSize: 34, fontWeight: '800', marginBottom: 8 },
+  statValue: { fontSize: 28, fontWeight: '800', marginBottom: 14 },
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
