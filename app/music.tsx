@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, TextInput, FlatList, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, FlatList } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,37 +28,24 @@ const getCoverLabel = (name?: string) => {
 
 const getTrackTitle = (track: any) => (track?.filename || 'Piste audio').replace(/\.[^.]+$/, '');
 
-function TrackRow({
-  item,
-  isCurrent,
-  onPress,
-  onPlay,
-}: {
-  item: any;
-  isCurrent: boolean;
-  onPress: () => void;
-  onPlay: () => void;
-}) {
+function TrackRow({ item, isCurrent, onPress, onPlay }: { item: any; isCurrent: boolean; onPress: () => void; onPlay: () => void }) {
   const { colors } = useTheme();
   const title = getTrackTitle(item);
   const tint = fallbackColor(title);
 
   return (
-    <Pressable onPress={onPress} style={[styles.trackRow, { backgroundColor: colors.card, borderColor: isCurrent ? colors.accent : colors.line }]}> 
+    <Pressable onPress={onPress} style={[styles.trackRow, { backgroundColor: colors.card, borderColor: isCurrent ? colors.accent : colors.line }]}>
       <Pressable onPress={onPlay} style={[styles.trackArt, { backgroundColor: tint }]}>
         <Text style={styles.trackArtText}>{getCoverLabel(title)}</Text>
       </Pressable>
 
       <View style={styles.trackInfo}>
         <Text style={[styles.trackTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
-        <Text style={[styles.trackMeta, { color: colors.muted }]}>Musique locale · {fmt(item.duration || 0)}</Text>
+        <Text style={[styles.trackMeta, { color: colors.muted }]}>Musique locale · {fmt(item?.duration || 0)}</Text>
       </View>
 
       <View style={styles.trackRight}>
-        <Text style={[styles.trackCount, { color: colors.muted }]}>
-          {isCurrent ? 'En cours' : `${Math.max(0, (item?.id || '').length % 9) + 1}`}
-        </Text>
-        <Ionicons name={isCurrent ? 'radio' : 'play'} size={18} color={isCurrent ? colors.accent : colors.text} />
+        <Text style={[styles.trackCount, { color: colors.muted }]}>{isCurrent ? 'En cours' : '▶'}</Text>
       </View>
     </Pressable>
   );
@@ -67,37 +54,39 @@ function TrackRow({
 export default function Music() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const m = useMusic();
+  const { loadTracks, queue, tracks, currentIndex, isPlaying, positionMs, durationMs, showQueue, isExpanded, setShowQueue, setExpanded, play, toggle, previous, next } = useMusic();
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    void m.loadTracks();
-  }, [m]);
+    void loadTracks();
+  }, [loadTracks]);
 
-  const current = m.tracks[m.currentIndex] ?? null;
+  const current = tracks[currentIndex] ?? null;
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return m.tracks.filter((item) => {
+    return tracks.filter((item) => {
       const title = (item?.filename || '').toLowerCase();
       return !q || title.includes(q);
     });
-  }, [m.tracks, query]);
+  }, [tracks, query]);
 
-  const queue = useMemo(
-    () => (m.queue?.length ? m.queue.map((index) => m.tracks[index]).filter(Boolean) : m.tracks),
-    [m.tracks, m.queue],
-  );
+  const displayQueue = useMemo(() => {
+    if (queue && queue.length) {
+      return queue.map((index) => tracks[index]).filter(Boolean);
+    }
+    return tracks;
+  }, [queue, tracks]);
 
-  const progress = m.durationMs ? (m.positionMs / m.durationMs) * 100 : 0;
+  const progress = durationMs ? (positionMs / durationMs) * 100 : 0;
   const currentTitle = current ? getTrackTitle(current) : 'Aucune piste';
   const currentColor = current ? fallbackColor(currentTitle) : colors.accent;
 
   return (
-    <View style={[styles.page, { backgroundColor: colors.bg, paddingTop: insets.top + 8 }]}> 
+    <View style={[styles.page, { backgroundColor: colors.bg, paddingTop: insets.top + 8 }]}>
       <ScreenHeader title="Musique" subtitle="Une belle bibliothèque à portée de main." />
 
-      <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+      <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.line }]}>
         <Ionicons name="search-outline" size={18} color={colors.muted} />
         <TextInput
           value={query}
@@ -109,39 +98,39 @@ export default function Music() {
       </View>
 
       {current && (
-        <Pressable onPress={() => m.setExpanded(true)} style={[styles.nowPlaying, { backgroundColor: colors.card, borderColor: colors.line }]}> 
-          <View style={[styles.artwork, { backgroundColor: currentColor }]}> 
+        <Pressable onPress={() => setExpanded(true)} style={[styles.nowPlaying, { backgroundColor: colors.card, borderColor: colors.line }]}>
+          <View style={[styles.artwork, { backgroundColor: currentColor }]}>
             <Text style={styles.artworkText}>{getCoverLabel(currentTitle)}</Text>
           </View>
 
           <View style={styles.nowInfo}>
             <Text style={[styles.label, { color: colors.muted }]}>EN COURS</Text>
             <Text style={[styles.nowTitle, { color: colors.text }]} numberOfLines={1}>{currentTitle}</Text>
-            <Text style={[styles.nowMeta, { color: colors.muted }]}>{fmt(m.positionMs)} / {fmt(m.durationMs)}</Text>
+            <Text style={[styles.nowMeta, { color: colors.muted }]}>{fmt(positionMs)} / {fmt(durationMs)}</Text>
             <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
               <View style={[styles.progressFill, { backgroundColor: colors.accent, width: `${Math.min(100, Math.max(0, progress))}%` }]} />
             </View>
           </View>
 
-          <Pressable onPress={() => m.toggle()} style={[styles.playFab, { backgroundColor: colors.accent }]}> 
-            <Ionicons name={m.isPlaying ? 'pause' : 'play'} size={22} color={colors.onAccent} />
+          <Pressable onPress={() => toggle()} style={[styles.playFab, { backgroundColor: colors.accent }]}>
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={22} color={colors.onAccent} />
           </Pressable>
         </Pressable>
       )}
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>File d’attente</Text>
-        <Pressable onPress={() => m.setShowQueue((value) => !value)}>
-          <Text style={[styles.sectionAction, { color: colors.accent }]}>{m.showQueue ? 'Masquer' : 'Voir'}</Text>
+        <Pressable onPress={() => setShowQueue((value) => !value)}>
+          <Text style={[styles.sectionAction, { color: colors.accent }]}>{showQueue ? 'Masquer' : 'Voir'}</Text>
         </Pressable>
       </View>
 
-      {m.showQueue && queue.length > 0 && (
-        <View style={[styles.queueBox, { backgroundColor: colors.card, borderColor: colors.line }]}> 
-          {queue.slice(0, 4).map((track: any, index: number) => (
+      {showQueue && displayQueue.length > 0 && (
+        <View style={[styles.queueBox, { backgroundColor: colors.card, borderColor: colors.line }]}>
+          {displayQueue.slice(0, 5).map((track: any, index: number) => (
             <Pressable
               key={`${track?.id ?? track?.uri ?? index}-queue`}
-              onPress={() => m.play(m.tracks.findIndex((item) => item.uri === track.uri))}
+              onPress={() => play(tracks.findIndex((item) => item.uri === track.uri))}
               style={styles.queueItem}
             >
               <Text style={[styles.queueTitle, { color: colors.text }]} numberOfLines={1}>
@@ -160,56 +149,55 @@ export default function Music() {
       <FlatList
         data={shown}
         keyExtractor={(item, index) => `${item?.id ?? item?.uri ?? index}`}
-        scrollEnabled={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(170, insets.bottom + 170) }]}
         renderItem={({ item, index }) => (
           <TrackRow
             item={item}
-            isCurrent={index === m.currentIndex}
-            onPress={() => m.play(index)}
-            onPlay={() => m.play(index)}
+            isCurrent={index === currentIndex}
+            onPress={() => play(index)}
+            onPlay={() => play(index)}
           />
         )}
         ListEmptyComponent={
-          <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+          <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.line }]}>
             <Text style={[styles.emptyText, { color: colors.muted }]}>Aucune piste ne correspond à ta recherche.</Text>
           </View>
         }
       />
 
-      {m.isExpanded && current && (
-        <View style={[styles.playerSheet, { backgroundColor: colors.bg, borderColor: colors.line }]}> 
-          <Pressable style={styles.sheetHandle} onPress={() => m.setExpanded(false)}>
+      {isExpanded && current && (
+        <View style={[styles.playerSheet, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+          <Pressable style={styles.sheetHandle} onPress={() => setExpanded(false)}>
             <View style={[styles.handleBar, { backgroundColor: colors.line }]} />
           </Pressable>
 
-          <View style={[styles.playerCard, { backgroundColor: colors.card, borderColor: colors.line }]}> 
-            <View style={[styles.bigArt, { backgroundColor: currentColor }]}> 
+          <View style={[styles.playerCard, { backgroundColor: colors.card, borderColor: colors.line }]}>
+            <View style={[styles.bigArt, { backgroundColor: currentColor }]}>
               <Text style={styles.bigArtText}>{getCoverLabel(currentTitle)}</Text>
             </View>
 
             <Text style={[styles.playerTitle, { color: colors.text }]}>{currentTitle}</Text>
-            <Text style={[styles.playerMeta, { color: colors.muted }]}>Lecture locale · {fmt(m.durationMs)}</Text>
+            <Text style={[styles.playerMeta, { color: colors.muted }]}>Lecture locale · {fmt(durationMs)}</Text>
 
-            <View style={[styles.progressTrack, { backgroundColor: colors.line }]}> 
+            <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
               <View style={[styles.progressFill, { backgroundColor: colors.accent, width: `${Math.min(100, Math.max(0, progress))}%` }]} />
             </View>
 
             <View style={styles.timeRow}>
-              <Text style={[styles.timeText, { color: colors.muted }]}>{fmt(m.positionMs)}</Text>
-              <Text style={[styles.timeText, { color: colors.muted }]}>{fmt(m.durationMs)}</Text>
+              <Text style={[styles.timeText, { color: colors.muted }]}>{fmt(positionMs)}</Text>
+              <Text style={[styles.timeText, { color: colors.muted }]}>{fmt(durationMs)}</Text>
             </View>
 
-            <View style={styles.playerControls}> 
-              <Pressable onPress={() => m.previous()} style={[styles.controlBtn, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+            <View style={styles.playerControls}>
+              <Pressable onPress={() => previous()} style={[styles.controlBtn, { backgroundColor: colors.card, borderColor: colors.line }]}>
                 <Ionicons name="play-skip-back" size={26} color={colors.text} />
               </Pressable>
 
-              <Pressable onPress={() => m.toggle()} style={[styles.primaryBtn, { backgroundColor: colors.accent }]}> 
-                <Ionicons name={m.isPlaying ? 'pause' : 'play'} size={32} color={colors.onAccent} />
+              <Pressable onPress={() => toggle()} style={[styles.primaryBtn, { backgroundColor: colors.accent }]}>
+                <Ionicons name={isPlaying ? 'pause' : 'play'} size={32} color={colors.onAccent} />
               </Pressable>
 
-              <Pressable onPress={() => m.next()} style={[styles.controlBtn, { backgroundColor: colors.card, borderColor: colors.line }]}> 
+              <Pressable onPress={() => next()} style={[styles.controlBtn, { backgroundColor: colors.card, borderColor: colors.line }]}>
                 <Ionicons name="play-skip-forward" size={26} color={colors.text} />
               </Pressable>
             </View>
@@ -217,27 +205,27 @@ export default function Music() {
         </View>
       )}
 
-      {current && !m.isExpanded && (
-        <View style={[styles.miniPlayer, { backgroundColor: colors.card, borderColor: colors.line }]}> 
-          <Pressable onPress={() => m.setExpanded(true)} style={styles.miniLeft}>
-            <View style={[styles.miniArt, { backgroundColor: currentColor }]}> 
+      {current && !isExpanded && (
+        <View style={[styles.miniPlayer, { backgroundColor: colors.card, borderColor: colors.line, bottom: Math.max(16, insets.bottom + 10) }]}>
+          <Pressable onPress={() => setExpanded(true)} style={styles.miniLeft}>
+            <View style={[styles.miniArt, { backgroundColor: currentColor }]}>
               <Text style={styles.miniArtText}>{getCoverLabel(currentTitle)}</Text>
             </View>
 
             <View style={styles.miniInfo}>
               <Text style={[styles.miniTitle, { color: colors.text }]} numberOfLines={1}>{currentTitle}</Text>
-              <Text style={[styles.miniMeta, { color: colors.muted }]}>{fmt(m.positionMs)} / {fmt(m.durationMs)}</Text>
+              <Text style={[styles.miniMeta, { color: colors.muted }]}>{fmt(positionMs)} / {fmt(durationMs)}</Text>
             </View>
           </Pressable>
 
-          <View style={styles.miniControls}> 
-            <Pressable onPress={() => m.previous()}>
+          <View style={styles.miniControls}>
+            <Pressable onPress={() => previous()}>
               <Ionicons name="play-skip-back" size={22} color={colors.text} />
             </Pressable>
-            <Pressable onPress={() => m.toggle()} style={[styles.miniPlay, { backgroundColor: colors.accent }]}> 
-              <Ionicons name={m.isPlaying ? 'pause' : 'play'} size={20} color={colors.onAccent} />
+            <Pressable onPress={() => toggle()} style={[styles.miniPlay, { backgroundColor: colors.accent }]}>
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color={colors.onAccent} />
             </Pressable>
-            <Pressable onPress={() => m.next()}>
+            <Pressable onPress={() => next()}>
               <Ionicons name="play-skip-forward" size={22} color={colors.text} />
             </Pressable>
           </View>
@@ -286,7 +274,7 @@ const styles = StyleSheet.create({
   queueBox: { marginHorizontal: 16, marginBottom: 16, borderRadius: 18, borderWidth: 1, paddingVertical: 8 },
   queueItem: { paddingHorizontal: 14, paddingVertical: 10 },
   queueTitle: { fontSize: 14, fontWeight: '600' },
-  listContent: { paddingHorizontal: 16, paddingBottom: 170 },
+  listContent: { paddingHorizontal: 16, paddingTop: 4 },
   trackRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -333,7 +321,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     right: 12,
-    bottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
